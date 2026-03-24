@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Dashboard — Margem & Lucro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --bg2: #141414;
+    --bg3: #1a1a1a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0f0f0;
+    --muted: #6b6b6b;
+    --muted2: #9a9a9a;
+    --accent: #FFE600;
+    --accent2: #fff176;
+    --green: #00e676;
+    --red: #ff5252;
+    --blue: #40c4ff;
+    --orange: #ff9100;
+    --font: 'Syne', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 2rem; padding: 2rem;
+  }
+  .login-logo { font-size: 13px; font-weight: 600; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
+  .login-title { font-size: clamp(28px,5vw,52px); font-weight: 700; line-height: 1.1; text-align: center; }
+  .login-title span { color: var(--accent); }
+  .login-desc { color: var(--muted2); font-size: 14px; text-align: center; max-width: 360px; line-height: 1.7; }
+  .btn-ml {
+    background: var(--accent); color: #111; font-family: var(--font); font-size: 14px; font-weight: 700;
+    padding: 14px 32px; border: none; border-radius: 4px; cursor: pointer;
+    letter-spacing: 0.04em; transition: opacity .15s, transform .1s;
+  }
+  .btn-ml:hover { opacity: .9; transform: translateY(-1px); }
+  .config-box {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px;
+    padding: 1.5rem; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .config-box label { font-size: 11px; font-weight: 600; color: var(--muted2); letter-spacing: 0.08em; text-transform: uppercase; }
+  .config-box input {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px;
+    color: var(--text); font-family: var(--mono); font-size: 13px; padding: 10px 12px; width: 100%;
+    outline: none; transition: border-color .15s;
+  }
+  .config-box input:focus { border-color: var(--accent); }
+  .config-row { display: flex; flex-direction: column; gap: 6px; }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .hint a { color: var(--accent); text-decoration: none; }
+
+  /* APP */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 100;
+  }
+  .h-logo { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .h-logo span { color: var(--accent); }
+  .h-right { display: flex; align-items: center; gap: 16px; }
+  .h-user { font-size: 13px; color: var(--muted2); }
+  .h-sync {
+    background: transparent; border: 1px solid var(--border2); color: var(--muted2);
+    font-family: var(--font); font-size: 12px; padding: 7px 14px; border-radius: 4px;
+    cursor: pointer; transition: all .15s; font-weight: 600;
+  }
+  .h-sync:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-logout { background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 12px; cursor: pointer; }
+  .btn-logout:hover { color: var(--red); }
+
+  nav {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    padding: 0 24px; overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 12px 18px; font-size: 13px; font-weight: 600; color: var(--muted2);
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: color .15s; background: none; border-top: none; border-left: none; border-right: none;
+    font-family: var(--font);
+  }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-tab:hover:not(.active) { color: var(--text); }
+
+  main { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+  /* LOADING */
+  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted2); font-size: 13px; padding: 3rem 0; }
+  .spin { width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* METRICS TOP */
+  .metrics-bar {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .metric-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; position: relative; overflow: hidden;
+    animation: fadeUp .4s ease both;
+  }
+  .metric-card::before { content:''; position: absolute; top:0; left:0; right:0; height:2px; background: var(--accent); opacity: 0; transition: opacity .2s; }
+  .metric-card:hover::before { opacity: 1; }
+  .mc-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+  .mc-value { font-family: var(--mono); font-size: 20px; font-weight: 500; color: var(--text); }
+  .mc-sub { font-size: 11px; color: var(--muted2); margin-top: 4px; }
+  .mc-sub.up { color: var(--green); }
+  .mc-sub.down { color: var(--red); }
+  .mc-sub.warn { color: var(--orange); }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+  /* PERIOD SELECTOR */
+  .period-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .period-btn {
+    background: var(--bg2); border: 1px solid var(--border); color: var(--muted2);
+    font-family: var(--font); font-size: 12px; font-weight: 600; padding: 7px 14px;
+    border-radius: 4px; cursor: pointer; transition: all .15s;
+  }
+  .period-btn.active { background: var(--accent); color: #111; border-color: var(--accent); }
+  .period-btn:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+
+  /* ORDERS TABLE */
+  .section-title { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { padding: 10px 16px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 11px 16px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,.02); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .badge-paid { background: rgba(0,230,118,.1); color: var(--green); }
+  .badge-pend { background: rgba(255,145,0,.1); color: var(--orange); }
+  .badge-cancel { background: rgba(255,82,82,.1); color: var(--red); }
+  .badge-ship { background: rgba(64,196,255,.1); color: var(--blue); }
+  .margin-good { color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .margin-warn { color: var(--orange); font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .margin-bad  { color: var(--red); font-family: var(--mono); font-size: 12px; font-weight: 500; }
+
+  /* COST EDITOR */
+  .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .product-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px; animation: fadeUp .3s ease both;
+  }
+  .pc-title { font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text); }
+  .pc-sku { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .pc-price { font-family: var(--mono); font-size: 16px; color: var(--accent); }
+  .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pc-label { font-size: 11px; color: var(--muted2); }
+  .cost-input {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px;
+    color: var(--text); font-family: var(--mono); font-size: 13px; padding: 7px 10px;
+    width: 120px; text-align: right; outline: none; transition: border-color .15s;
+  }
+  .cost-input:focus { border-color: var(--accent); }
+  .pc-margin-bar { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+  .pc-margin-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+  .pc-margin-label { font-size: 11px; font-family: var(--mono); }
+  .btn-save-cost {
+    background: var(--accent); color: #111; font-family: var(--font); font-size: 11px; font-weight: 700;
+    border: none; border-radius: 4px; padding: 8px 14px; cursor: pointer; align-self: flex-end;
+    transition: opacity .15s;
+  }
+  .btn-save-cost:hover { opacity: .85; }
+  .saved-flash { color: var(--green); font-size: 11px; font-weight: 600; opacity: 0; transition: opacity .3s; }
+
+  /* DEMO BANNER */
+  .demo-banner {
+    background: rgba(255,230,0,.07); border: 1px solid rgba(255,230,0,.2);
+    border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;
+    font-size: 12px; color: var(--accent2); line-height: 1.6;
+  }
+  .demo-banner strong { color: var(--accent); }
+
+  /* EMPTY */
+  .empty { padding: 3rem; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* CHART PLACEHOLDER */
+  .chart-area { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 24px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+  .chart-bar { flex: 1; border-radius: 2px 2px 0 0; transition: opacity .2s; cursor: default; position: relative; }
+  .chart-bar:hover { opacity: .8; }
+  .chart-x { display: flex; gap: 4px; margin-top: 6px; }
+  .chart-x span { flex: 1; text-align: center; font-size: 9px; color: var(--muted); font-family: var(--mono); }
+
+  /* OAUTH CALLBACK */
+  #callback-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-logo">ML Dashboard</div>
+  <h1 class="login-title">Vendas. Custo.<br><span>Margem real.</span></h1>
+  <p class="login-desc">Conecte sua conta do Mercado Livre, cadastre o custo dos produtos e veja sua margem de contribuição em tempo real.</p>
+
+  <div class="config-box">
+    <div class="config-row">
+      <label>APP ID (Client ID)</label>
+      <input type="text" id="app-id-input" placeholder="Ex: 123456789" />
+    </div>
+    <div class="config-row">
+      <label>Client Secret</label>
+      <input type="password" id="secret-input" placeholder="Cole seu client secret" />
+    </div>
+    <div class="config-row">
+      <label>Redirect URI</label>
+      <input type="text" id="redirect-input" value="" id="redirect-uri-input" placeholder="http://localhost/callback" />
+    </div>
+    <p class="hint">
+      Crie seu app em <a href="https://developers.mercadolivre.com.br" target="_blank">developers.mercadolivre.com.br</a> e cole as credenciais acima. A Redirect URI deve ser a URL desta página.
+    </p>
+    <button class="btn-ml" onclick="startOAuth()">Conectar com Mercado Livre</button>
+    <button class="btn-ml" style="background:var(--bg3);color:var(--muted2);border:1px solid var(--border2);" onclick="loadDemo()">Ver Demo (dados fictícios)</button>
+  </div>
+</div>
+
+<!-- CALLBACK -->
+<div id="callback-screen" style="display:none">
+  <div class="spin" style="width:32px;height:32px;border-width:3px;"></div>
+  <p style="color:var(--muted2);font-size:14px;">Autenticando com Mercado Livre...</p>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="h-logo">ML <span>Dashboard</span></div>
+    <div class="h-right">
+      <span class="h-user" id="h-user-name"></span>
+      <button class="h-sync" onclick="syncData()">↻ Sincronizar</button>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="nav-tab active" onclick="showTab('dashboard', this)">Dashboard</button>
+    <button class="nav-tab" onclick="showTab('orders', this)">Pedidos</button>
+    <button class="nav-tab" onclick="showTab('products', this)">Produtos & Custos</button>
+  </nav>
+
+  <main id="main-content"></main>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const ML_AUTH_URL = 'https://auth.mercadolivre.com.br/authorization';
+const ML_TOKEN_URL = 'https://api.mercadolibre.com/oauth/token';
+const ML_API = 'https://api.mercadolibre.com';
+
+let state = {
+  token: null,
+  userId: null,
+  userName: '',
+  costs: {}, // { itemId: custo }
+  orders: [],
+  items: [],
+  isDemo: false
+};
+
+// ─── UTILS ────────────────────────────────────────────────
+const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const pct = v => Number(v).toFixed(1) + '%';
+const save = () => localStorage.setItem('ml_dash_state', JSON.stringify({costs: state.costs, token: state.token, userId: state.userId, userName: state.userName}));
+const load = () => { try { const d = JSON.parse(localStorage.getItem('ml_dash_state')||'{}'); Object.assign(state, d); } catch(e){} };
+
+function marginClass(m) {
+  if (m >= 20) return 'margin-good';
+  if (m >= 10) return 'margin-warn';
+  return 'margin-bad';
+}
+function badgeClass(status) {
+  if (status === 'paid') return 'badge-paid';
+  if (status === 'cancelled') return 'badge-cancel';
+  if (status === 'pending') return 'badge-pend';
+  return 'badge-ship';
+}
+function badgeLabel(status) {
+  const map = {paid:'pago', cancelled:'cancelado', pending:'pendente', confirmed:'confirmado', payment_required:'aguard. pgto', partially_refunded:'reembolso'};
+  return map[status] || status;
+}
+
+// ─── OAUTH ────────────────────────────────────────────────
+function startOAuth() {
+  const appId = document.getElementById('app-id-input').value.trim();
+  const secret = document.getElementById('secret-input').value.trim();
+  const redirectUri = document.getElementById('redirect-input').value.trim();
+  if (!appId || !redirectUri) { alert('Preencha o APP ID e a Redirect URI.'); return; }
+  localStorage.setItem('ml_app_id', appId);
+  localStorage.setItem('ml_secret', secret);
+  localStorage.setItem('ml_redirect', redirectUri);
+  const url = `${ML_AUTH_URL}?response_type=code&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  window.location.href = url;
+}
+
+async function handleCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (!code) return false;
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('callback-screen').style.display = 'flex';
+
+  const appId = localStorage.getItem('ml_app_id');
+  const secret = localStorage.getItem('ml_secret');
+  const redirectUri = localStorage.getItem('ml_redirect');
+
+  try {
+    const res = await fetch(ML_TOKEN_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: appId,
+        client_secret: secret,
+        code: code,
+        redirect_uri: redirectUri
+      })
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      state.token = data.access_token;
+      localStorage.setItem('ml_refresh_token', data.refresh_token || '');
+      window.history.replaceState({}, '', window.location.pathname);
+      await initApp();
+    } else {
+      alert('Erro ao autenticar: ' + JSON.stringify(data));
+      document.getElementById('callback-screen').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } catch(e) {
+    alert('Erro de conexão: ' + e.message);
+    document.getElementById('callback-screen').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+  return true;
+}
+
+async function refreshToken() {
+  const refresh = localStorage.getItem('ml_refresh_token');
+  const appId = localStorage.getItem('ml_app_id');
+  const secret = localStorage.getItem('ml_secret');
+  if (!refresh || !appId) return false;
+  try {
+    const res = await fetch(ML_TOKEN_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({grant_type: 'refresh_token', client_id: appId, client_secret: secret, refresh_token: refresh})
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      state.token = data.access_token;
+      localStorage.setItem('ml_refresh_token', data.refresh_token || refresh);
+      save();
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function mlGet(path) {
+  let res = await fetch(ML_API + path, {headers: {'Authorization': `Bearer ${state.token}`}});
+  if (res.status === 401) {
+    const ok = await refreshToken();
+    if (ok) res = await fetch(ML_API + path, {headers: {'Authorization': `Bearer ${state.token}`}});
+  }
+  if (!res.ok) throw new Error('API error ' + res.status);
+  return res.json();
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+async function initApp() {
+  document.getElementById('callback-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  showTab('dashboard', document.querySelector('.nav-tab'));
+  renderLoading();
+
+  try {
+    const me = await mlGet('/users/me');
+    state.userId = me.id;
+    state.userName = me.nickname || me.first_name || 'Vendedor';
+    document.getElementById('h-user-name').textContent = state.userName;
+    save();
+    await syncData();
+  } catch(e) {
+    showError('Erro ao carregar dados: ' + e.message);
+  }
+}
+
+async function syncData() {
+  renderLoading();
+  try {
+    // Buscar pedidos (últimos 50)
+    const ordersRes = await mlGet(`/orders/search?seller=${state.userId}&sort=date_desc&offset=0&limit=50`);
+    state.orders = ordersRes.results || [];
+
+    // Buscar itens
+    const itemsRes = await mlGet(`/users/${state.userId}/items/search?limit=100`);
+    const itemIds = (itemsRes.results || []).slice(0, 20);
+    if (itemIds.length > 0) {
+      const itemsData = await mlGet(`/items?ids=${itemIds.join(',')}`);
+      state.items = (itemsData || []).map(r => r.body).filter(Boolean);
+    }
+    save();
+    renderCurrentTab();
+  } catch(e) {
+    showError('Erro ao sincronizar: ' + e.message);
+  }
+}
+
+function renderLoading() {
+  document.getElementById('main-content').innerHTML = `<div class="loading"><div class="spin"></div> Carregando dados...</div>`;
+}
+function showError(msg) {
+  document.getElementById('main-content').innerHTML = `<div class="empty">${msg}</div>`;
+}
+
+// ─── TAB ROUTING ──────────────────────────────────────────
+let currentTab = 'dashboard';
+function showTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderCurrentTab();
+}
+function renderCurrentTab() {
+  if (currentTab === 'dashboard') renderDashboard();
+  else if (currentTab === 'orders') renderOrders();
+  else if (currentTab === 'products') renderProducts();
+}
+
+// ─── CALC HELPERS ─────────────────────────────────────────
+function calcOrderMetrics(order) {
+  const sale = order.total_amount || 0;
+  const mlFee = (order.payments || []).reduce((a,p) => a + (p.marketplace_fee || 0), 0) || sale * 0.12;
+  const freeShipping = order.shipping?.free_shipping ? sale * 0.07 : 0;
+  const taxes = sale * 0.004;
+  // custo: usa o primeiro item do pedido como referência
+  const firstItem = (order.order_items || [])[0];
+  const itemId = firstItem?.item?.id;
+  const cost = itemId && state.costs[itemId] ? Number(state.costs[itemId]) * (firstItem?.quantity || 1) : 0;
+  const contrib = sale - mlFee - freeShipping - taxes - cost;
+  const margin = sale > 0 ? (contrib / sale) * 100 : 0;
+  return { sale, mlFee, freeShipping, taxes, cost, contrib, margin };
+}
+
+function aggregateMetrics(orders) {
+  let totalSale = 0, totalFee = 0, totalShip = 0, totalTax = 0, totalCost = 0, totalContrib = 0;
+  const paid = orders.filter(o => o.status === 'paid');
+  paid.forEach(o => {
+    const m = calcOrderMetrics(o);
+    totalSale += m.sale; totalFee += m.mlFee; totalShip += m.freeShipping;
+    totalTax += m.taxes; totalCost += m.cost; totalContrib += m.contrib;
+  });
+  const margin = totalSale > 0 ? (totalContrib / totalSale) * 100 : 0;
+  return { totalSale, totalFee, totalShip, totalTax, totalCost, totalContrib, margin, count: paid.length };
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────
+function renderDashboard() {
+  const m = aggregateMetrics(state.orders);
+  const allSale = state.orders.reduce((a, o) => a + (o.total_amount||0), 0);
+  const cancelled = state.orders.filter(o => o.status === 'cancelled').length;
+
+  // Chart: vendas por dia últimos 14 dias
+  const dayMap = {};
+  const now = new Date();
+  for (let i=13; i>=0; i--) {
+    const d = new Date(now); d.setDate(d.getDate()-i);
+    const key = d.toISOString().slice(0,10);
+    dayMap[key] = 0;
+  }
+  state.orders.filter(o => o.status==='paid').forEach(o => {
+    const key = (o.date_created||'').slice(0,10);
+    if (dayMap[key] !== undefined) dayMap[key] += o.total_amount||0;
+  });
+  const days = Object.keys(dayMap);
+  const vals = days.map(d => dayMap[d]);
+  const maxVal = Math.max(...vals, 1);
+
+  const demoHint = state.isDemo ? `<div class="demo-banner"><strong>Modo Demo</strong> — Dados fictícios para demonstração. Conecte sua conta do ML para ver dados reais.</div>` : '';
+
+  document.getElementById('main-content').innerHTML = `
+    ${demoHint}
+    <div class="period-bar">
+      <span style="font-size:12px;color:var(--muted2);">Período:</span>
+      <button class="period-btn active">Últimos 30 dias</button>
+      <button class="period-btn">7 dias</button>
+      <button class="period-btn">Hoje</button>
+    </div>
+
+    <div class="metrics-bar">
+      <div class="metric-card" style="animation-delay:.0s">
+        <div class="mc-label">Líquido vendido</div>
+        <div class="mc-value">${fmt(m.totalSale)}</div>
+        <div class="mc-sub">${m.count} pedidos pagos</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.05s">
+        <div class="mc-label">Margem contribuição</div>
+        <div class="mc-value" style="color:${m.margin>=20?'var(--green)':m.margin>=10?'var(--orange)':'var(--red)'}">${pct(m.margin)}</div>
+        <div class="mc-sub ${m.margin>=20?'up':m.margin>=10?'warn':'down'}">${fmt(m.totalContrib)} líquido</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.1s">
+        <div class="mc-label">Taxas ML</div>
+        <div class="mc-value">${fmt(m.totalFee)}</div>
+        <div class="mc-sub warn">${m.totalSale>0?pct(m.totalFee/m.totalSale*100):0} da receita</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.15s">
+        <div class="mc-label">Frete grátis</div>
+        <div class="mc-value">${fmt(m.totalShip)}</div>
+        <div class="mc-sub warn">${m.totalSale>0?pct(m.totalShip/m.totalSale*100):0} da receita</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.2s">
+        <div class="mc-label">Custo produtos</div>
+        <div class="mc-value">${fmt(m.totalCost)}</div>
+        <div class="mc-sub down">${m.totalSale>0?pct(m.totalCost/m.totalSale*100):0} da receita</div>
+      </div>
+      <div class="metric-card" style="animation-delay:.25s">
+        <div class="mc-label">Cancelados</div>
+        <div class="mc-value">${cancelled}</div>
+        <div class="mc-sub down">${state.orders.length > 0 ? pct(cancelled/state.orders.length*100) : '0%'} dos pedidos</div>
+      </div>
+    </div>
+
+    <div class="chart-area">
+      <p class="section-title">Vendas diárias — últimos 14 dias</p>
+      <div class="chart-bars">
+        ${vals.map((v,i) => `<div class="chart-bar" style="height:${Math.max(4,Math.round(v/maxVal*100))}%;background:${v>0?'var(--accent)':'var(--border2)'};opacity:${v>0?1:.4}" title="${days[i]}: ${fmt(v)}"></div>`).join('')}
+      </div>
+      <div class="chart-x">
+        ${days.map((d,i) => `<span>${i%2===0?d.slice(5):'·'}</span>`).join('')}
+      </div>
+    </div>
+
+    <p class="section-title">Últimos pedidos</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Pedido</th><th>Produto</th><th>Valor</th><th>Taxa ML</th><th>Custo</th><th>Margem</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          ${state.orders.slice(0,10).map(o => {
+            const m2 = calcOrderMetrics(o);
+            const item = (o.order_items||[])[0];
+            return `<tr>
+              <td class="mono">#${String(o.id).slice(-6)}</td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item?.item?.title || '—'}</td>
+              <td class="mono">${fmt(m2.sale)}</td>
+              <td class="mono" style="color:var(--orange)">${fmt(m2.mlFee)}</td>
+              <td class="mono" style="color:var(--muted2)">${m2.cost>0?fmt(m2.cost):'—'}</td>
+              <td><span class="${marginClass(m2.margin)}">${pct(m2.margin)}</span></td>
+              <td><span class="badge ${badgeClass(o.status)}">${badgeLabel(o.status)}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ─── ORDERS ───────────────────────────────────────────────
+function renderOrders() {
+  const rows = state.orders.map(o => {
+    const m = calcOrderMetrics(o);
+    const item = (o.order_items||[])[0];
+    return `<tr>
+      <td class="mono">#${String(o.id).slice(-6)}</td>
+      <td style="font-size:12px;color:var(--muted2)">${(o.date_created||'').slice(0,10)}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${item?.item?.title || '—'}</td>
+      <td class="mono">${fmt(m.sale)}</td>
+      <td class="mono" style="color:var(--orange)">${fmt(m.mlFee)}</td>
+      <td class="mono" style="color:var(--orange)">${fmt(m.freeShipping)}</td>
+      <td class="mono" style="color:var(--muted2)">${m.cost>0?fmt(m.cost):'—'}</td>
+      <td class="mono">${fmt(m.contrib)}</td>
+      <td><span class="${marginClass(m.margin)}">${pct(m.margin)}</span></td>
+      <td><span class="badge ${badgeClass(o.status)}">${badgeLabel(o.status)}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('main-content').innerHTML = `
+    <p class="section-title">Todos os pedidos (${state.orders.length})</p>
+    <div class="table-wrap" style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Pedido</th><th>Data</th><th>Produto</th><th>Receita</th><th>Taxa ML</th><th>Frete Grátis</th><th>Custo</th><th>Contribuição</th><th>Margem</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem">Nenhum pedido encontrado</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ─── PRODUCTS & COSTS ─────────────────────────────────────
+function renderProducts() {
+  if (state.items.length === 0) {
+    document.getElementById('main-content').innerHTML = `<div class="empty">Nenhum produto encontrado. Sincronize para carregar seus anúncios.</div>`;
+    return;
+  }
+  const cards = state.items.map(item => {
+    const cost = state.costs[item.id] || '';
+    const price = item.price || 0;
+    const margin = cost && price > 0 ? ((price - Number(cost) - price*0.12 - price*0.07 - price*0.004) / price * 100) : null;
+    const marginColor = margin === null ? 'var(--muted)' : margin >= 20 ? 'var(--green)' : margin >= 10 ? 'var(--orange)' : 'var(--red)';
+    const fillPct = margin === null ? 0 : Math.min(100, Math.max(0, margin));
+    return `
+    <div class="product-card" id="card-${item.id}">
+      <div>
+        <div class="pc-title">${item.title}</div>
+        <div class="pc-sku">${item.id}</div>
+      </div>
+      <div class="pc-price">${fmt(price)}</div>
+      <div class="pc-row">
+        <span class="pc-label">Custo unitário (R$)</span>
+        <input class="cost-input" id="cost-${item.id}" type="number" step="0.01" min="0" value="${cost}" placeholder="0,00" oninput="updateMarginPreview('${item.id}', ${price})" />
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span class="pc-label">Margem estimada</span>
+          <span class="pc-margin-label" id="mlabel-${item.id}" style="color:${marginColor}">${margin !== null ? pct(margin) : '—'}</span>
+        </div>
+        <div class="pc-margin-bar">
+          <div class="pc-margin-fill" id="mfill-${item.id}" style="width:${fillPct}%;background:${marginColor}"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Considera: 12% ML + 7% frete grátis + 0.4% impostos</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">
+        <span class="saved-flash" id="saved-${item.id}">✓ Salvo</span>
+        <button class="btn-save-cost" onclick="saveCost('${item.id}', ${price})">Salvar custo</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('main-content').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <p class="section-title" style="margin:0">Produtos & Custos (${state.items.length})</p>
+      <span style="font-size:11px;color:var(--muted2)">Os custos são salvos localmente no seu navegador</span>
+    </div>
+    <div class="products-grid">${cards}</div>
+  `;
+}
+
+function updateMarginPreview(itemId, price) {
+  const costVal = Number(document.getElementById('cost-' + itemId)?.value || 0);
+  const margin = price > 0 ? ((price - costVal - price*0.12 - price*0.07 - price*0.004) / price * 100) : null;
+  const color = margin === null ? 'var(--muted)' : margin >= 20 ? 'var(--green)' : margin >= 10 ? 'var(--orange)' : 'var(--red)';
+  const fillPct = margin === null ? 0 : Math.min(100, Math.max(0, margin));
+  const lbl = document.getElementById('mlabel-' + itemId);
+  const fill = document.getElementById('mfill-' + itemId);
+  if (lbl) { lbl.textContent = margin !== null ? pct(margin) : '—'; lbl.style.color = color; }
+  if (fill) { fill.style.width = fillPct + '%'; fill.style.background = color; }
+}
+
+function saveCost(itemId, price) {
+  const input = document.getElementById('cost-' + itemId);
+  if (!input) return;
+  state.costs[itemId] = input.value;
+  save();
+  updateMarginPreview(itemId, price);
+  const flash = document.getElementById('saved-' + itemId);
+  if (flash) { flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 1800); }
+}
+
+// ─── DEMO ─────────────────────────────────────────────────
+function loadDemo() {
+  state.isDemo = true;
+  state.token = 'DEMO';
+  state.userId = 'demo';
+  state.userName = 'Demo Vendedor';
+  state.orders = generateDemoOrders();
+  state.items = generateDemoItems();
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('h-user-name').textContent = state.userName;
+  showTab('dashboard', document.querySelector('.nav-tab'));
+}
+
+function generateDemoOrders() {
+  const titles = ['Fone Bluetooth Pro Max','Teclado Mecânico RGB','SSD NVMe 1TB','Webcam Full HD 1080p','Mouse Gamer Sem Fio','Monitor LED 24"','Headset USB Stereo','Carregador Rápido 65W'];
+  const statuses = ['paid','paid','paid','paid','paid','shipping','pending','cancelled'];
+  const fees = [0.11,0.12,0.135,0.11,0.12,0.13,0.12,0.11];
+  const orders = [];
+  for (let i=0; i<50; i++) {
+    const t = titles[i % titles.length];
+    const price = [89.90, 249.90, 399.90, 179.90, 299.90, 899.90, 149.90, 79.90][i % 8];
+    const qty = [1,1,1,2,1,1,3,1][i % 8];
+    const dayAgo = Math.floor(Math.random() * 30);
+    const d = new Date(); d.setDate(d.getDate() - dayAgo);
+    const itemId = 'MLB' + (100000 + (i % 8) * 1111);
+    orders.push({
+      id: 2000000 + i,
+      status: statuses[i % statuses.length],
+      date_created: d.toISOString(),
+      total_amount: price * qty,
+      payments: [{marketplace_fee: price * qty * fees[i % fees.length]}],
+      shipping: {free_shipping: i % 3 !== 0},
+      order_items: [{item: {id: itemId, title: t}, quantity: qty, unit_price: price}]
+    });
+  }
+  return orders;
+}
+
+function generateDemoItems() {
+  const data = [
+    {id:'MLB100111', title:'Fone Bluetooth Pro Max', price:89.90},
+    {id:'MLB101222', title:'Teclado Mecânico RGB', price:249.90},
+    {id:'MLB102333', title:'SSD NVMe 1TB', price:399.90},
+    {id:'MLB103444', title:'Webcam Full HD 1080p', price:179.90},
+    {id:'MLB104555', title:'Mouse Gamer Sem Fio', price:299.90},
+    {id:'MLB105666', title:'Monitor LED 24"', price:899.90},
+    {id:'MLB106777', title:'Headset USB Stereo', price:149.90},
+    {id:'MLB107888', title:'Carregador Rápido 65W', price:79.90},
+  ];
+  // demo costs pre-loaded
+  data.forEach(d => { if (!state.costs[d.id]) state.costs[d.id] = (d.price * 0.4).toFixed(2); });
+  return data;
+}
+
+// ─── LOGOUT ───────────────────────────────────────────────
+function logout() {
+  state.token = null; state.userId = null; state.isDemo = false;
+  localStorage.removeItem('ml_dash_state');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ─── BOOT ─────────────────────────────────────────────────
+(async function boot() {
+  load();
+  // Pre-fill redirect URI
+  const inp = document.getElementById('redirect-input');
+  if (inp) inp.value = window.location.origin + window.location.pathname;
+
+  // Check callback
+  if (window.location.search.includes('code=')) {
+    const handled = await handleCallback();
+    if (handled) return;
+  }
+
+  // Already have token
+  if (state.token && state.token !== 'DEMO' && state.userId) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('h-user-name').textContent = state.userName;
+    showTab('dashboard', document.querySelector('.nav-tab'));
+    await syncData();
+    return;
+  }
+
+  // Demo state
+  if (state.isDemo && state.token === 'DEMO') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('h-user-name').textContent = state.userName;
+    showTab('dashboard', document.querySelector('.nav-tab'));
+    return;
+  }
+})();
+</script>
+</body>
+</html>
